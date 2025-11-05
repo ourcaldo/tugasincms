@@ -92,13 +92,13 @@ This approach:
 CREATE TABLE post_redirects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
-  -- Source post (the post being redirected FROM)
-  source_post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE UNIQUE,
+  -- Source post UUID (NO FK - allows tombstone redirects after post deletion)
+  source_post_id UUID NOT NULL UNIQUE,
   
-  -- Redirect type
+  -- Redirect type: 'post' or 'url'
   redirect_type VARCHAR(20) NOT NULL CHECK (redirect_type IN ('post', 'url')),
   
-  -- Target for post-to-post redirects
+  -- Target for post-to-post redirects (FK prevents deleting target posts)
   target_post_id UUID REFERENCES posts(id) ON DELETE NO ACTION,
   
   -- Target for external URL redirects
@@ -122,6 +122,7 @@ CREATE TABLE post_redirects (
 );
 
 -- Indexes for performance
+CREATE INDEX idx_redirects_source_post ON post_redirects(source_post_id);  -- Critical for lookups!
 CREATE INDEX idx_redirects_target_post ON post_redirects(target_post_id) WHERE target_post_id IS NOT NULL;
 CREATE INDEX idx_redirects_created_by ON post_redirects(created_by);
 CREATE INDEX idx_redirects_type ON post_redirects(redirect_type);
@@ -136,13 +137,52 @@ CREATE INDEX idx_redirects_type ON post_redirects(redirect_type);
 5. **Check constraints**: Ensures data integrity (valid redirect types, no self-redirects)
 6. **HTTP status codes**: Supports different redirect semantics (301 permanent, 302 temporary, etc.)
 
-### Tombstone Pattern
+### Tombstone Pattern - How Redirects Persist After Deletion
 
 **Critical Design Decision**: Redirects survive source post deletion
-- When you delete a post, its redirect configuration **remains active**
-- Future requests to deleted post UUID still return redirect metadata
-- This allows content consolidation without losing redirect history
-- Redirect record acts as a "tombstone" marking where content was moved
+
+#### Why This Matters
+
+**Real-World Content Consolidation:**
+1. You have Post A and Post B (duplicate/similar content)
+2. You merge Post A's content into Post B
+3. You configure redirect: Post A → Post B
+4. You **DELETE Post A** (no longer needed, content merged)
+5. User visits old Post A URL (from bookmark, Google, old link)
+6. **They MUST still redirect to Post B** ← Only works if redirect survives!
+
+**Without tombstone redirects:**
+- ❌ Old links return 404 Not Found
+- ❌ SEO value lost
+- ❌ Bookmarks broken
+- ❌ Content consolidation defeats its own purpose
+
+**With tombstone redirects:**
+- ✅ Old links seamlessly redirect to merged content
+- ✅ SEO value preserved (301 redirects)
+- ✅ Bookmarks continue working
+- ✅ Zero broken links for users
+
+#### How It Works - Separate Tables
+
+```
+posts table:                    post_redirects table:
+┌─────────────────┐            ┌──────────────────────────┐
+│ id (UUID) PK    │            │ source_post_id (UUID)    │ ← NO FK!
+│ title           │            │ redirect_type            │
+│ content         │            │ target_post_id           │
+│ ...             │            │ target_url               │
+└─────────────────┘            │ http_status_code         │
+                               └──────────────────────────┘
+
+When Post A is deleted from posts table:
+→ Row removed from posts
+→ Redirect row STAYS in post_redirects (no CASCADE)
+→ source_post_id still contains Post A's UUID
+→ Acts as "tombstone" marker
+```
+
+**Key:** `source_post_id` has **NO foreign key constraint** - it's just a UUID value that can reference deleted posts!
 
 ### Redirect Configuration Flexibility
 
@@ -181,6 +221,114 @@ CREATE INDEX idx_redirects_type ON post_redirects(redirect_type);
 ---
 
 ## 🔄 Redirection Logic & Flow
+
+### API Logic for Handling Deleted Posts with Redirects
+
+**Endpoint:** `GET /api/v1/posts/{uuid}`
+
+#### Current Logic (Without Redirects)
+```typescript
+// ❌ This ONLY works for active posts
+async function getPost(uuid: string) {
+  const post = await db.posts.findById(uuid);
+  if (!post) return 404;
+  return post;
+}
+```
+
+#### New Logic (With Tombstone Redirects)
+```typescript
+async function getPost(uuid: string) {
+  // Step 1: Try to fetch post from posts table
+  const post = await db.posts.findById(uuid);
+  
+  // Step 2: ALWAYS check for redirect (even if post deleted!)
+  const redirect = await db.post_redirects.findBySourceId(uuid);
+  
+  // Step 3: Handle all scenarios
+  
+  // Scenario A: Active post WITH redirect configured
+  if (post && redirect) {
+    return {
+      ...post,              // Full post data (title, content, etc.)
+      redirect: {           // Redirect metadata
+        type: redirect.redirect_type,
+        httpStatus: redirect.http_status_code,
+        target: redirect.redirect_type === 'post' 
+          ? await resolveTargetPost(redirect.target_post_id)
+          : { url: redirect.target_url },
+        notes: redirect.notes
+      }
+    };
+  }
+  
+  // Scenario B: Active post WITHOUT redirect
+  if (post && !redirect) {
+    return {
+      ...post,
+      redirect: null        // No redirect configured
+    };
+  }
+  
+  // Scenario C: DELETED post WITH redirect (TOMBSTONE!)
+  if (!post && redirect) {
+    return {
+      id: uuid,
+      deleted: true,        // Flag: post no longer exists
+      redirect: {           // But redirect still works!
+        type: redirect.redirect_type,
+        httpStatus: redirect.http_status_code,
+        target: redirect.redirect_type === 'post'
+          ? await resolveTargetPost(redirect.target_post_id)
+          : { url: redirect.target_url },
+        notes: redirect.notes
+      }
+    };
+  }
+  
+  // Scenario D: Deleted post WITHOUT redirect
+  if (!post && !redirect) {
+    return { 
+      status: 404, 
+      error: 'Post not found' 
+    };
+  }
+}
+
+// Helper: Resolve target post details
+async function resolveTargetPost(targetPostId: string) {
+  const targetPost = await db.posts.findById(targetPostId);
+  
+  if (!targetPost) {
+    return {
+      postId: targetPostId,
+      error: 'Target post has been deleted',
+      httpStatus: 410  // Gone
+    };
+  }
+  
+  return {
+    postId: targetPost.id,
+    slug: targetPost.slug,
+    title: targetPost.title
+  };
+}
+```
+
+#### The Key Insight
+
+**The API checks BOTH tables:**
+1. `posts` table → Check if post exists
+2. `post_redirects` table → Check if redirect exists (by source_post_id = uuid)
+
+**Even when post is deleted:**
+- ✅ Redirect record remains in `post_redirects` table
+- ✅ API finds redirect by UUID
+- ✅ Returns redirect metadata with `deleted: true` flag
+- ✅ Frontend redirects user to target
+- ✅ Zero broken links!
+
+---
 
 ### Flow Scenarios
 
@@ -259,18 +407,63 @@ Backend response:
 Frontend action: Redirect to https://newsite.com/article
 ```
 
-#### Scenario 4: Circular Redirect Detection (Backend Validation)
+#### Scenario 4: DELETED Post WITH Redirect (TOMBSTONE - Most Important!)
 ```
-Setup: Trying to create redirect Post A → Post B when Post B → Post A exists
-Backend validation: REJECT on creation/update
-Error response:
+Setup: 
+1. Post A redirects to Post B (content consolidated)
+2. Post A is DELETED from posts table
+3. Redirect record remains in post_redirects table
+
+Frontend requests: GET /api/v1/posts/uuid-deleted-post-a
+Backend finds: Post does NOT exist in posts, BUT redirect exists
+Backend response:
 {
-  "success": false,
-  "error": "Circular redirect detected: Post A already redirects to Post B"
+  "success": true,
+  "data": {
+    "id": "uuid-deleted-post-a",
+    "deleted": true,           // ← Post is gone!
+    "redirect": {              // ← But redirect still works!
+      "type": "post",
+      "httpStatus": 301,
+      "target": {
+        "postId": "uuid-post-b",
+        "slug": "merged-post-slug",
+        "title": "Comprehensive Guide"
+      },
+      "notes": "Content merged into comprehensive guide"
+    }
+  }
 }
+
+Frontend action: 
+- Automatically redirect to Post B
+- User never knows Post A was deleted
+- Bookmarks keep working
+- Google/SEO redirects properly
+- Zero broken links!
+
+Why this matters:
+✅ This is the CORE use case for content consolidation
+✅ Allows deleting duplicate posts without breaking links
+✅ Preserves SEO value through proper redirects
+✅ Maintains user experience (no 404 errors)
 ```
 
-#### Scenario 5: Target Post Deleted (Broken Redirect)
+#### Scenario 5: Deleted Post WITHOUT Redirect
+```
+Frontend requests: GET /api/v1/posts/uuid-truly-deleted-post
+Backend finds: Post does NOT exist, NO redirect configured
+Backend response:
+{
+  "success": false,
+  "status": 404,
+  "error": "Post not found"
+}
+
+Frontend action: Show 404 error page
+```
+
+#### Scenario 6: Target Post Deleted (Broken Redirect)
 ```
 Setup: Post A → Post B, then Post B is deleted
 Frontend requests: GET /api/v1/posts/uuid-post-a
@@ -296,7 +489,7 @@ Backend response:
 Frontend action: Show error message or fallback to displaying Post A
 ```
 
-#### Scenario 6: Deleting Post with Active Redirects
+#### Scenario 7: Deleting Target Post (Has Redirects Pointing TO It)
 ```
 User tries to delete Post B (which has redirects pointing TO it)
 Backend checks: Are there redirects where target_post_id = Post B?
@@ -305,15 +498,110 @@ Response:
   "success": false,
   "error": "Cannot delete post. The following posts redirect to it:",
   "redirects": [
-    { "postId": "uuid-a", "title": "Post A" },
+    { "postId": "uuid-a", "title": "Post A (deleted)" },
     { "postId": "uuid-c", "title": "Post C" }
   ]
 }
 
 User must:
-1. Remove/update those redirects first, OR
-2. Confirm "Delete Anyway" (sets ON DELETE NO ACTION → redirect remains but broken)
+1. Remove redirects from Post A and Post C first, OR
+2. Update redirects to point to different target
+
+Note: ON DELETE NO ACTION prevents accidental deletion
 ```
+
+#### Scenario 8: Circular Redirect Detection (Backend Validation)
+```
+Setup: Trying to create redirect Post A → Post B when Post B → Post A exists
+Backend validation: REJECT on creation/update
+Error response:
+{
+  "success": false,
+  "error": "Circular redirect detected: Post B already redirects to Post A"
+}
+```
+
+---
+
+### Post Deletion Flows - Complete Guide
+
+#### When You Delete a SOURCE Post (Post WITH Redirect Configured)
+
+**Scenario:** Post A redirects to Post B → You delete Post A
+
+**What Happens:**
+1. Post A row is **DELETED** from `posts` table
+2. Redirect record **REMAINS** in `post_redirects` table (no FK constraint)
+3. `source_post_id` still contains Post A's UUID (tombstone)
+
+**Future API Calls:**
+```
+GET /api/v1/posts/post-a-uuid
+
+Response:
+{
+  "id": "post-a-uuid",
+  "deleted": true,           ← Post is gone
+  "redirect": { ... }        ← But redirect still works!
+}
+```
+
+**Result:**
+- ✅ Old links still redirect to Post B
+- ✅ SEO value preserved
+- ✅ Bookmarks keep working
+- ✅ Content consolidation successful!
+
+---
+
+#### When You Try to Delete a TARGET Post (Post That Others Redirect TO)
+
+**Scenario:** Post A redirects to Post B → You try to delete Post B
+
+**What Happens:**
+1. Backend checks: `SELECT * FROM post_redirects WHERE target_post_id = post-b-uuid`
+2. Finds dependent redirects from Post A
+3. **PREVENTS deletion** with error message
+
+**API Response:**
+```json
+{
+  "success": false,
+  "error": "Cannot delete. These posts redirect here:",
+  "redirects": [
+    { "postId": "post-a-uuid", "title": "Post A" }
+  ]
+}
+```
+
+**User Must:**
+1. Remove redirect from Post A, OR
+2. Change Post A to redirect elsewhere
+
+**Why:** `ON DELETE NO ACTION` on `target_post_id` prevents accidental broken redirects
+
+---
+
+#### When You Delete a Post WITHOUT Redirect
+
+**Scenario:** Normal post with no redirect configured → You delete it
+
+**What Happens:**
+1. Post row deleted from `posts` table
+2. No redirect record exists
+3. Standard 404 response
+
+**Future API Calls:**
+```
+GET /api/v1/posts/deleted-post-uuid
+
+Response 404:
+{
+  "error": "Post not found"
+}
+```
+
+---
 
 ### Redirect Resolution Logic (Backend)
 
