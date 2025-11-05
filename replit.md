@@ -207,6 +207,22 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Critical UX Fixes - Redirect Form Scrolling and Status Code Display
+  - **FIXED**: Post list scrolling issue in redirect creation/edit dialogs - users couldn't scroll through long lists of posts
+  - **ROOT CAUSE (Scrolling)**: CommandList component didn't have max-height set, preventing scroll when many posts exist
+  - **SOLUTION (Scrolling)**: Added `className="max-h-[300px] overflow-y-auto"` to all three CommandList components
+  - **FILES CHANGED**: `components/settings/redirects-list.tsx` (lines 259, 322, 577)
+  - **FIXED**: HTTP Status Code field showing "-" (empty) instead of actual status code value (301, 302, etc.)
+  - **ROOT CAUSE (Status Code)**: API returned snake_case database field names (`http_status_code`) but frontend TypeScript expected camelCase (`httpStatusCode`)
+  - **SOLUTION (Status Code)**: Added explicit field mapping in all redirect API endpoints to convert snake_case to camelCase
+  - **FILES CHANGED**: 
+    - `app/api/settings/redirects/route.ts` (GET and POST endpoints)
+    - `app/api/settings/redirects/[id]/route.ts` (PUT endpoint)
+  - **IMPACT**: Redirect creation and editing now works smoothly with proper scrolling for 1000+ posts
+  - Users can now see the actual HTTP status codes (301, 302, 307, 308) instead of empty values
+  - Field mapping ensures consistency between database schema (snake_case) and TypeScript interfaces (camelCase)
+  - **ARCHITECT REVIEWED**: Confirmed fixes are complete, consistent, and align with `types/index.ts::PostRedirect` interface
+
 - November 5, 2025: UX Enhancement - Searchable Post Selection in Redirects Form
   - **ADDED**: Searchable combobox for Source Post and Target Post fields in redirect creation/edit forms
   - **FEATURE**: Users can now search posts by both title AND post ID/UUID for easier selection
