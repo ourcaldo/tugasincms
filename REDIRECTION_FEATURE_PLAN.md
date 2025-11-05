@@ -74,9 +74,8 @@ This approach:
 CREATE TABLE post_redirects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
-  -- Source post (nullable to support tombstones)
-  source_post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
-  source_slug VARCHAR(255) NOT NULL,  -- Preserved even if post deleted
+  -- Source post (the post being redirected FROM)
+  source_post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE UNIQUE,
   
   -- Redirect type
   redirect_type VARCHAR(20) NOT NULL CHECK (redirect_type IN ('post', 'url')),
@@ -101,43 +100,23 @@ CREATE TABLE post_redirects (
     (redirect_type = 'post' AND target_post_id IS NOT NULL AND target_url IS NULL) OR
     (redirect_type = 'url' AND target_url IS NOT NULL AND target_post_id IS NULL)
   ),
-  CONSTRAINT unique_source_slug UNIQUE (source_slug)
+  CONSTRAINT no_self_redirect CHECK (source_post_id != target_post_id)
 );
 
 -- Indexes for performance
-CREATE INDEX idx_redirects_source_post ON post_redirects(source_post_id) WHERE source_post_id IS NOT NULL;
-CREATE INDEX idx_redirects_source_slug ON post_redirects(source_slug);
 CREATE INDEX idx_redirects_target_post ON post_redirects(target_post_id) WHERE target_post_id IS NOT NULL;
 CREATE INDEX idx_redirects_created_by ON post_redirects(created_by);
-
--- Trigger to capture slug when post is deleted (tombstone pattern)
-CREATE OR REPLACE FUNCTION capture_post_slug_on_redirect()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- If source_slug is empty and source_post_id exists, capture the slug
-  IF NEW.source_slug IS NULL OR NEW.source_slug = '' THEN
-    SELECT slug INTO NEW.source_slug
-    FROM posts
-    WHERE id = NEW.source_post_id;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_capture_slug_before_insert
-  BEFORE INSERT ON post_redirects
-  FOR EACH ROW
-  EXECUTE FUNCTION capture_post_slug_on_redirect();
+CREATE INDEX idx_redirects_type ON post_redirects(redirect_type);
 ```
 
 ### Schema Rationale
 
-1. **`source_post_id` is NULLABLE**: Allows redirect to persist after source post deletion (tombstone)
-2. **`source_slug` is NOT NULL**: Always preserved, enables lookups by slug even after deletion
-3. **`target_post_id` uses ON DELETE NO ACTION**: Prevents accidental deletion of target posts with active redirects
-4. **Unique constraint on `source_slug`**: One redirect per source slug (no ambiguity)
-5. **Check constraints**: Ensures data integrity for redirect types
-6. **HTTP status codes**: Supports different redirect semantics (permanent vs temporary)
+1. **`source_post_id` is NOT NULL with UNIQUE constraint**: One redirect per post, directly tied to post ID
+2. **`source_post_id` uses ON DELETE CASCADE**: When source post is deleted, redirect is automatically removed
+3. **`target_post_id` uses ON DELETE NO ACTION**: Prevents accidental deletion of target posts with active redirects pointing to them
+4. **No `source_slug` field needed**: Frontend uses UUID for lookups, not slugs
+5. **Check constraints**: Ensures data integrity (valid redirect types, no self-redirects)
+6. **HTTP status codes**: Supports different redirect semantics (301 permanent, 302 temporary, etc.)
 
 ---
 
@@ -145,72 +124,74 @@ CREATE TRIGGER trg_capture_slug_before_insert
 
 ### Flow Scenarios
 
-#### Scenario 1: Active Post with Redirect (Post-to-Post)
+#### Scenario 1: Post WITHOUT Redirect
 ```
-Frontend requests: GET /api/v1/posts/old-post-slug
-Backend finds: Post exists + redirect configured
+Frontend requests: GET /api/v1/posts/69be701a-5fe3-4834-9503-89cb34477b9f
+Backend finds: Post exists, no redirect configured
 Backend response:
 {
   "success": true,
   "data": {
-    "id": "uuid-123",
+    "id": "69be701a-5fe3-4834-9503-89cb34477b9f",
+    "title": "My Post",
+    "slug": "my-post-slug",
+    "content": "...",
+    "redirect": null  // Always included, null when no redirect
+  }
+}
+
+Frontend action: Display post normally
+```
+
+#### Scenario 2: Post WITH Redirect (Post-to-Post)
+```
+Frontend requests: GET /api/v1/posts/uuid-old-post
+Backend finds: Post exists + redirect configured to another post
+Backend response:
+{
+  "success": true,
+  "data": {
+    "id": "uuid-old-post",
     "slug": "old-post-slug",
     "title": "Old Post",
-    ...
+    "content": "...",
     "redirect": {
       "type": "post",
       "httpStatus": 301,
       "target": {
-        "postId": "uuid-456",
+        "postId": "uuid-new-post",
         "slug": "new-post-slug",
         "title": "New Post"
-      }
+      },
+      "notes": "Content consolidated"
     }
   }
 }
 
-Frontend action: Redirect to /blog/{category}/new-post-slug/
+Frontend action: 
+- Option A: Automatically redirect to uuid-new-post
+- Option B: Show banner "This post redirects to [New Post]"
+- Option C: Redirect after 3 seconds
 ```
 
-#### Scenario 2: Deleted Post with Redirect (Tombstone)
+#### Scenario 3: Post WITH Redirect (Post-to-URL)
 ```
-Frontend requests: GET /api/v1/posts/deleted-post-slug
-Backend finds: No post, but redirect exists (tombstone)
-Backend response:
-{
-  "success": false,
-  "error": "Post not found",
-  "redirect": {
-    "type": "post",
-    "httpStatus": 301,
-    "source_slug": "deleted-post-slug",
-    "target": {
-      "postId": "uuid-789",
-      "slug": "replacement-post-slug",
-      "title": "Replacement Post"
-    }
-  }
-}
-
-Frontend action: Redirect to /blog/{category}/replacement-post-slug/
-```
-
-#### Scenario 3: Redirect to External URL
-```
-Frontend requests: GET /api/v1/posts/moved-post-slug
+Frontend requests: GET /api/v1/posts/uuid-moved-post
 Backend response:
 {
   "success": true,
   "data": {
-    "id": "uuid-abc",
+    "id": "uuid-moved-post",
     "slug": "moved-post-slug",
-    ...
+    "title": "Moved Post",
+    "content": "...",
     "redirect": {
       "type": "url",
       "httpStatus": 301,
       "target": {
         "url": "https://newsite.com/article"
-      }
+      },
+      "notes": "Moved to external platform"
     }
   }
 }
@@ -218,36 +199,60 @@ Backend response:
 Frontend action: Redirect to https://newsite.com/article
 ```
 
-#### Scenario 4: Circular Redirect Detection
+#### Scenario 4: Circular Redirect Detection (Backend Validation)
 ```
-Setup: Post A → Post B → Post A (circular)
+Setup: Trying to create redirect Post A → Post B when Post B → Post A exists
 Backend validation: REJECT on creation/update
 Error response:
 {
   "success": false,
-  "error": "Circular redirect detected: post-a-slug → post-b-slug → post-a-slug"
+  "error": "Circular redirect detected: Post A already redirects to Post B"
 }
 ```
 
-#### Scenario 5: Target Post Deleted
+#### Scenario 5: Target Post Deleted (Broken Redirect)
 ```
 Setup: Post A → Post B, then Post B is deleted
-Frontend requests: GET /api/v1/posts/post-a-slug
+Frontend requests: GET /api/v1/posts/uuid-post-a
 Backend response:
 {
-  "success": false,
-  "error": "Post not found",
-  "redirect": {
-    "type": "post",
-    "httpStatus": 410,
-    "target": {
-      "postId": null,
-      "error": "Target post has been deleted"
+  "success": true,
+  "data": {
+    "id": "uuid-post-a",
+    "title": "Post A",
+    "content": "...",
+    "redirect": {
+      "type": "post",
+      "httpStatus": 410,
+      "target": {
+        "postId": "uuid-post-b",
+        "error": "Target post has been deleted"
+      },
+      "notes": "Content consolidated"
     }
   }
 }
 
-Frontend action: Show 410 Gone page
+Frontend action: Show error message or fallback to displaying Post A
+```
+
+#### Scenario 6: Deleting Post with Active Redirects
+```
+User tries to delete Post B (which has redirects pointing TO it)
+Backend checks: Are there redirects where target_post_id = Post B?
+Response:
+{
+  "success": false,
+  "error": "Cannot delete post. The following posts redirect to it:",
+  "redirects": [
+    { "postId": "uuid-a", "title": "Post A" },
+    { "postId": "uuid-c", "title": "Post C" }
+  ]
+}
+
+User must:
+1. Remove/update those redirects first, OR
+2. Confirm "Delete Anyway" (sets ON DELETE NO ACTION → redirect remains but broken)
 ```
 
 ### Redirect Resolution Logic (Backend)
