@@ -207,6 +207,20 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Critical Bug Fix - Redirects API 500 Error (Invalid Foreign Key Reference)
+  - **FIXED**: HTTP 500 error when accessing `/api/settings/redirects` endpoint
+  - **ROOT CAUSE**: Query attempted to use non-existent foreign key `post_redirects_source_post_id_fkey` in Supabase join
+  - **TECHNICAL DETAILS**: Per REDIRECTION_FEATURE_PLAN.md design, `source_post_id` has NO foreign key constraint (intentional, for tombstone pattern support)
+  - **IMPACT**: Redirects settings page completely broken - users unable to view, create, or manage redirects
+  - **FILES FIXED**:
+    - `app/api/settings/redirects/route.ts` (line 28): Removed invalid `source_post:posts!post_redirects_source_post_id_fkey` join
+    - Added manual post fetching logic to enrich redirects with source post details after initial query
+    - `lib/redirect-validator.ts` (line 159): Removed problematic `posts!inner(title)` join in `validateTargetPostDeletion()`
+    - Added separate query to fetch source post titles for better error messages
+  - **SOLUTION**: Changed from FK-based joins to manual post fetching using `.in()` queries
+  - **RESULT**: Redirects API now properly handles tombstone pattern where source posts may not exist
+  - All redirect management functionality restored and working correctly
+
 - November 5, 2025: Bug Fix - Redirects Page "posts.map is not a function" Error
   - **FIXED**: Error on settings/redirects page preventing redirect creation/editing
   - **ROOT CAUSE**: `components/settings/redirects-list.tsx` line 81 was accessing wrong data structure

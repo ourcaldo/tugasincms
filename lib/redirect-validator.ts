@@ -153,11 +153,7 @@ export async function validateTargetPostDeletion(postId: string): Promise<Valida
 
   const { data: inboundRedirects, error } = await supabase
     .from('post_redirects')
-    .select(`
-      id,
-      source_post_id,
-      posts!inner(title)
-    `)
+    .select('id, source_post_id')
     .eq('target_post_id', postId)
     .eq('redirect_type', 'post');
 
@@ -167,8 +163,26 @@ export async function validateTargetPostDeletion(postId: string): Promise<Valida
   }
 
   if (inboundRedirects && inboundRedirects.length > 0) {
+    const sourcePostIds = inboundRedirects.map(r => r.source_post_id).filter(Boolean);
+    
+    let postTitles: string[] = [];
+    if (sourcePostIds.length > 0) {
+      const { data: sourcePosts } = await supabase
+        .from('posts')
+        .select('id, title')
+        .in('id', sourcePostIds);
+      
+      if (sourcePosts) {
+        postTitles = sourcePosts.map(p => p.title);
+      }
+    }
+    
+    const titlesList = postTitles.length > 0 
+      ? postTitles.join(', ')
+      : 'some posts';
+    
     errors.push(
-      `Cannot delete this post. ${inboundRedirects.length} redirect(s) point to it. ` +
+      `Cannot delete this post. ${inboundRedirects.length} redirect(s) point to it from: ${titlesList}. ` +
       `Please remove or update these redirects first.`
     );
     

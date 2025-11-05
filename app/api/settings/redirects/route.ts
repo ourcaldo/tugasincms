@@ -25,7 +25,6 @@ export async function GET(request: NextRequest) {
       .from('post_redirects')
       .select(`
         *,
-        source_post:posts!post_redirects_source_post_id_fkey(id, title, slug, status),
         target_post:posts!post_redirects_target_post_id_fkey(id, title, slug, status)
       `, { count: 'exact' })
       .eq('created_by', currentUserId)
@@ -44,8 +43,34 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
+    const redirectsData = redirects || []
+    
+    const sourcePostIds = redirectsData
+      .map(r => r.source_post_id)
+      .filter((id): id is string => id != null)
+    
+    let sourcePostsMap: Record<string, any> = {}
+    if (sourcePostIds.length > 0) {
+      const { data: sourcePosts } = await supabase
+        .from('posts')
+        .select('id, title, slug, status')
+        .in('id', sourcePostIds)
+      
+      if (sourcePosts) {
+        sourcePostsMap = sourcePosts.reduce((acc, post) => {
+          acc[post.id] = post
+          return acc
+        }, {} as Record<string, any>)
+      }
+    }
+    
+    const enrichedRedirects = redirectsData.map(redirect => ({
+      ...redirect,
+      source_post: sourcePostsMap[redirect.source_post_id] || null
+    }))
+
     return successResponse({
-      redirects: redirects || [],
+      redirects: enrichedRedirects,
       pagination: {
         page,
         limit,
