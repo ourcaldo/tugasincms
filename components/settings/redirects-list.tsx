@@ -9,12 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
-import { Plus, MoreHorizontal, Trash, Edit, ExternalLink, FileText } from 'lucide-react'
+import { Plus, MoreHorizontal, Trash, Edit, ExternalLink, FileText, Check, ChevronsUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useApiClient } from '../../lib/api-client'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { cn } from '../ui/utils'
 import type { PostRedirect } from '../../types'
 
 interface RedirectWithRelations extends PostRedirect {
@@ -49,6 +52,8 @@ export function RedirectsList() {
     notes: '',
   })
   const [posts, setPosts] = useState<Array<{ id: string; title: string; slug: string }>>([])
+  const [sourcePostOpen, setSourcePostOpen] = useState(false)
+  const [targetPostOpen, setTargetPostOpen] = useState(false)
   const apiClient = useApiClient()
 
   useEffect(() => {
@@ -228,24 +233,55 @@ export function RedirectsList() {
               <DialogHeader>
                 <DialogTitle>Create New Redirect</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-6 py-4">
                 <div>
                   <Label htmlFor="sourcePost">Source Post*</Label>
-                  <Select
-                    value={formData.sourcePostId}
-                    onValueChange={(value) => setFormData({ ...formData, sourcePostId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select source post" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {posts.map((post) => (
-                        <SelectItem key={post.id} value={post.id}>
-                          {post.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={sourcePostOpen} onOpenChange={setSourcePostOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={sourcePostOpen}
+                        className="w-full justify-between mt-2"
+                      >
+                        {formData.sourcePostId
+                          ? posts.find((post) => post.id === formData.sourcePostId)?.title
+                          : "Search by title or ID..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search by title or post ID..." />
+                        <CommandList>
+                          <CommandEmpty>No post found.</CommandEmpty>
+                          <CommandGroup>
+                            {posts.map((post) => (
+                              <CommandItem
+                                key={post.id}
+                                value={`${post.title} ${post.id}`}
+                                onSelect={() => {
+                                  setFormData({ ...formData, sourcePostId: post.id })
+                                  setSourcePostOpen(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.sourcePostId === post.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{post.title}</span>
+                                  <span className="text-xs text-muted-foreground">{post.id}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 <div>
@@ -255,6 +291,7 @@ export function RedirectsList() {
                     onValueChange={(value) =>
                       setFormData({ ...formData, redirectType: value as 'post' | 'url' })
                     }
+                    className="mt-2"
                   >
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="post">Post to Post</TabsTrigger>
@@ -262,21 +299,52 @@ export function RedirectsList() {
                     </TabsList>
                     <TabsContent value="post" className="mt-4">
                       <Label htmlFor="targetPost">Target Post*</Label>
-                      <Select
-                        value={formData.targetPostId}
-                        onValueChange={(value) => setFormData({ ...formData, targetPostId: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select target post" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {posts.filter(p => p.id !== formData.sourcePostId).map((post) => (
-                            <SelectItem key={post.id} value={post.id}>
-                              {post.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={targetPostOpen} onOpenChange={setTargetPostOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={targetPostOpen}
+                            className="w-full justify-between mt-2"
+                          >
+                            {formData.targetPostId
+                              ? posts.find((post) => post.id === formData.targetPostId)?.title
+                              : "Search by title or ID..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search by title or post ID..." />
+                            <CommandList>
+                              <CommandEmpty>No post found.</CommandEmpty>
+                              <CommandGroup>
+                                {posts.filter(p => p.id !== formData.sourcePostId).map((post) => (
+                                  <CommandItem
+                                    key={post.id}
+                                    value={`${post.title} ${post.id}`}
+                                    onSelect={() => {
+                                      setFormData({ ...formData, targetPostId: post.id })
+                                      setTargetPostOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.targetPostId === post.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{post.title}</span>
+                                      <span className="text-xs text-muted-foreground">{post.id}</span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </TabsContent>
                     <TabsContent value="url" className="mt-4">
                       <Label htmlFor="targetUrl">Target URL*</Label>
@@ -285,6 +353,7 @@ export function RedirectsList() {
                         placeholder="https://example.com/article"
                         value={formData.targetUrl}
                         onChange={(e) => setFormData({ ...formData, targetUrl: e.target.value })}
+                        className="mt-2"
                       />
                     </TabsContent>
                   </Tabs>
@@ -298,7 +367,7 @@ export function RedirectsList() {
                       setFormData({ ...formData, httpStatusCode: parseInt(value) })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-2">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -317,6 +386,7 @@ export function RedirectsList() {
                     placeholder="Optional notes about this redirect..."
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="mt-2"
                   />
                 </div>
               </div>
@@ -457,7 +527,7 @@ export function RedirectsList() {
           <DialogHeader>
             <DialogTitle>Edit Redirect</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-6 py-4">
             <div>
               <Label>Source Post</Label>
               <Input
@@ -465,6 +535,7 @@ export function RedirectsList() {
                   posts.find(p => p.id === formData.sourcePostId)?.title || 'Unknown Post'
                 }
                 disabled
+                className="mt-2"
               />
             </div>
 
@@ -475,6 +546,7 @@ export function RedirectsList() {
                 onValueChange={(value) =>
                   setFormData({ ...formData, redirectType: value as 'post' | 'url' })
                 }
+                className="mt-2"
               >
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="post">Post to Post</TabsTrigger>
@@ -482,21 +554,52 @@ export function RedirectsList() {
                 </TabsList>
                 <TabsContent value="post" className="mt-4">
                   <Label htmlFor="editTargetPost">Target Post*</Label>
-                  <Select
-                    value={formData.targetPostId}
-                    onValueChange={(value) => setFormData({ ...formData, targetPostId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select target post" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {posts.filter(p => p.id !== formData.sourcePostId).map((post) => (
-                        <SelectItem key={post.id} value={post.id}>
-                          {post.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={targetPostOpen} onOpenChange={setTargetPostOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={targetPostOpen}
+                        className="w-full justify-between mt-2"
+                      >
+                        {formData.targetPostId
+                          ? posts.find((post) => post.id === formData.targetPostId)?.title
+                          : "Search by title or ID..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search by title or post ID..." />
+                        <CommandList>
+                          <CommandEmpty>No post found.</CommandEmpty>
+                          <CommandGroup>
+                            {posts.filter(p => p.id !== formData.sourcePostId).map((post) => (
+                              <CommandItem
+                                key={post.id}
+                                value={`${post.title} ${post.id}`}
+                                onSelect={() => {
+                                  setFormData({ ...formData, targetPostId: post.id })
+                                  setTargetPostOpen(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.targetPostId === post.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{post.title}</span>
+                                  <span className="text-xs text-muted-foreground">{post.id}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </TabsContent>
                 <TabsContent value="url" className="mt-4">
                   <Label htmlFor="editTargetUrl">Target URL*</Label>
@@ -505,6 +608,7 @@ export function RedirectsList() {
                     placeholder="https://example.com/article"
                     value={formData.targetUrl}
                     onChange={(e) => setFormData({ ...formData, targetUrl: e.target.value })}
+                    className="mt-2"
                   />
                 </TabsContent>
               </Tabs>
@@ -518,7 +622,7 @@ export function RedirectsList() {
                   setFormData({ ...formData, httpStatusCode: parseInt(value) })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="mt-2">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -537,6 +641,7 @@ export function RedirectsList() {
                 placeholder="Optional notes about this redirect..."
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="mt-2"
               />
             </div>
           </div>

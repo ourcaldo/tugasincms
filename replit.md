@@ -207,6 +207,16 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: UX Enhancement - Searchable Post Selection in Redirects Form
+  - **ADDED**: Searchable combobox for Source Post and Target Post fields in redirect creation/edit forms
+  - **FEATURE**: Users can now search posts by both title AND post ID/UUID for easier selection
+  - **IMPROVED**: Form field spacing - Added consistent top margin (mt-2) to all input fields
+  - **ENHANCED**: Visual feedback with checkmarks showing selected posts
+  - **IMPROVED**: Each post shows both title and UUID in dropdown for better identification
+  - **RESULT**: Much easier to find and select posts in large post lists (handles 1000+ posts efficiently)
+  - Better UX especially when dealing with similar post titles or needing to find specific posts by ID
+  - Consistent spacing throughout all form fields improves visual hierarchy and readability
+
 - November 5, 2025: Critical Bug Fix - Redirects API 500 Error (Invalid Foreign Key Reference)
   - **FIXED**: HTTP 500 error when accessing `/api/settings/redirects` endpoint
   - **ROOT CAUSE**: Query attempted to use non-existent foreign key `post_redirects_source_post_id_fkey` in Supabase join
