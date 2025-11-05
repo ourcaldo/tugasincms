@@ -253,7 +253,7 @@ export function RedirectsList() {
                     <PopoverContent className="w-full p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search by title or post ID..." />
-                        <CommandList>
+                        <CommandList className="max-h-[300px] overflow-y-auto">
                           <CommandEmpty>No post found.</CommandEmpty>
                           <CommandGroup>
                             {posts.map((post) => (
@@ -316,7 +316,7 @@ export function RedirectsList() {
                         <PopoverContent className="w-full p-0" align="start">
                           <Command>
                             <CommandInput placeholder="Search by title or post ID..." />
-                            <CommandList>
+                            <CommandList className="max-h-[300px] overflow-y-auto">
                               <CommandEmpty>No post found.</CommandEmpty>
                               <CommandGroup>
                                 {posts.filter(p => p.id !== formData.sourcePostId).map((post) => (
@@ -571,7 +571,7 @@ export function RedirectsList() {
                     <PopoverContent className="w-full p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search by title or post ID..." />
-                        <CommandList>
+                        <CommandList className="max-h-[300px] overflow-y-auto">
                           <CommandEmpty>No post found.</CommandEmpty>
                           <CommandGroup>
                             {posts.filter(p => p.id !== formData.sourcePostId).map((post) => (
