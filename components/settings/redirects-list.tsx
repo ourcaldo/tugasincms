@@ -76,9 +76,14 @@ export function RedirectsList() {
     try {
       const response = await apiClient.get<{
         success: boolean
-        data: Array<{ id: string; title: string; slug: string }>
-      }>('/posts')
-      setPosts(response.data || [])
+        data: {
+          posts: Array<{ id: string; title: string; slug: string }>
+          total: number
+          page: number
+          limit: number
+        }
+      }>('/posts?limit=1000')
+      setPosts(response.data.posts || [])
     } catch (error) {
       setPosts([])
     }

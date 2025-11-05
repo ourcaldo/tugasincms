@@ -207,6 +207,16 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Bug Fix - Redirects Page "posts.map is not a function" Error
+  - **FIXED**: Error on settings/redirects page preventing redirect creation/editing
+  - **ROOT CAUSE**: `components/settings/redirects-list.tsx` line 81 was accessing wrong data structure
+  - **ISSUE**: `setPosts(response.data || [])` set posts to the entire data object instead of the posts array
+  - **API RETURNS**: `{ success: true, data: { posts: [...], total: 100, page: 1, limit: 20 } }`
+  - **SOLUTION**: Changed to `setPosts(response.data.posts || [])` to extract the posts array
+  - **IMPROVED**: Added `?limit=1000` to fetch all posts for dropdown selector
+  - Fixed TypeScript type definition to match actual API response structure
+  - All post selection dropdowns now work correctly in redirect dialogs
+
 - November 5, 2025: Documentation Update - API_DOCUMENTATION.md Updated for Redirect Feature
   - **UPDATED**: Added `redirect` field to all post object examples in API_DOCUMENTATION.md
   - **SECTIONS UPDATED**:
