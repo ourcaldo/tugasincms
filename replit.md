@@ -207,6 +207,18 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Post Redirection Feature - Planning & Documentation
+  - **PLANNED**: Comprehensive post redirection system for managing content consolidation and URL changes
+  - **DOCUMENTED**: Complete feature specification in `REDIRECTION_FEATURE_PLAN.md`
+  - **DESIGNED**: Database schema for `post_redirects` table with tombstone pattern support
+  - **DESIGNED**: Redirect types: post-to-post and post-to-URL with HTTP status code support (301, 302, 307, 308)
+  - **DESIGNED**: Edge case handling: circular redirect detection, deleted post handling, chain redirect resolution
+  - **DESIGNED**: API structure: redirect metadata included in post responses, new `/api/settings/redirects` endpoints
+  - **DESIGNED**: Settings UI for redirect management with validation and search capabilities
+  - **PLANNED**: 8-day implementation timeline with complete SQL migrations and rollback scripts
+  - Feature supports production-ready redirect management with caching, performance optimization, and security
+  - Enables content cannibalization workflows and maintains SEO through proper redirect handling
+
 - October 17, 2025: Sitemap Auto-Regeneration System
   - **CHANGED**: Sitemap cache TTL from permanent to 60 minutes (3600s)
   - **ADDED**: Automatic sitemap regeneration every 60 minutes via background cron job
