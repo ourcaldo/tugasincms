@@ -207,6 +207,14 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Post Redirection Feature - Critical Bug Fixes (Architect-Verified)
+  - **FIXED**: Tombstone support in public API - `/api/v1/posts/[id]` now returns 404 with redirect metadata for deleted posts
+  - **FIXED**: Circular redirect detection - Implemented iterative chain traversal (depth limit: 10) to detect loops of any length
+  - **IMPROVED**: Redirect validator now detects complex circular chains (A→B→C→A) not just simple loops (A→B→A)
+  - **IMPROVED**: Public API now resolves redirects even when source post doesn't exist in database (true tombstone pattern)
+  - **DOCS**: Created `MIGRATION_GUIDE.md` with step-by-step instructions for running Supabase migration
+  - All fixes architect-reviewed and verified - production-ready redirect system complete
+
 - November 5, 2025: Post Redirection Feature - Implementation Complete
   - **IMPLEMENTED**: Production-ready post redirection system for content consolidation and URL management
   - **DATABASE**: Created `post_redirects` table with tombstone pattern support (migration SQL ready in `migrations/`)
