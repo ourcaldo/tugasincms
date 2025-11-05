@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error
     
-    const postsWithRelations = mapPostsFromDB(posts || [])
+    const postsWithRelations = await mapPostsFromDB(posts || [])
     
     const totalPages = Math.ceil((count || 0) / limit)
     

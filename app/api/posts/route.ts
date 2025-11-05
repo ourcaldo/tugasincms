@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error
     
-    const postsWithRelations = mapPostsFromDB(posts || [])
+    const postsWithRelations = await mapPostsFromDB(posts || [])
     
     const responseData = {
       posts: postsWithRelations,
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     
     if (fetchError) throw fetchError
     
-    return successResponse(mapPostFromDB(fullPost), false, 201)
+    return successResponse(await mapPostFromDB(fullPost), false, 201)
   } catch (error) {
     console.error('Error creating post:', error)
     return errorResponse('Failed to create post')

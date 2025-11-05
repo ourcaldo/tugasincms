@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error
     
-    const postsWithRelations = mapPostsFromDB(publishedPosts || [])
+    const postsWithRelations = await mapPostsFromDB(publishedPosts || [])
     
     await setCachedData(cacheKey, postsWithRelations, 3600)
     

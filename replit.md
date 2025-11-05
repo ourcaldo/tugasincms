@@ -207,6 +207,21 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Critical Bug Fix - Missing await in Post Mapper Functions
+  - **FIXED**: All API endpoints returning `"posts": {}` (empty object) instead of posts array
+  - **ROOT CAUSE**: `mapPostsFromDB()` and `mapPostFromDB()` are async functions but were called without `await` in 10 different files
+  - **IMPACT**: All posts endpoints (`/api/v1/posts`, `/api/public/posts`, internal APIs) were broken
+  - **FIXED FILES**: 
+    - `app/api/v1/posts/route.ts` - GET endpoint
+    - `app/api/posts/route.ts` - GET and POST endpoints
+    - `app/api/posts/[id]/route.ts` - GET and PUT endpoints
+    - `app/api/public/posts/route.ts` - GET endpoint
+    - `app/api/public/posts/[id]/route.ts` - GET endpoint
+    - `app/api/v1/tags/[id]/route.ts` - GET endpoint
+    - `app/api/v1/categories/[id]/route.ts` - GET endpoint
+  - **EXPLANATION**: When async functions are called without `await`, they return a Promise object instead of the resolved value. When serialized to JSON, Promise objects become `{}` (empty object)
+  - All endpoints now properly return post arrays with full data
+
 - November 5, 2025: Database Migration Fix - Post Redirects created_by Column Type
   - **FIXED**: Database migration error - Changed `created_by` column type from UUID to VARCHAR(255)
   - **REASON**: CMS uses Clerk authentication with string-based user IDs (e.g., 'user_33QTHobngBl4hGcnuEjuKnOhlqr'), not UUIDs

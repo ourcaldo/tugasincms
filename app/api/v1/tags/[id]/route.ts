@@ -96,7 +96,7 @@ export async function GET(
       
       if (postsError) throw postsError
       
-      postsData = mapPostsFromDB(posts || [])
+      postsData = await mapPostsFromDB(posts || [])
     }
     
     const totalPages = Math.ceil((count || 0) / limit)
