@@ -81,8 +81,21 @@ export async function PUT(
 
     await invalidateRedirectCache(existingRedirect.source_post_id)
 
+    const mappedRedirect = {
+      id: updatedRedirect.id,
+      sourcePostId: updatedRedirect.source_post_id,
+      redirectType: updatedRedirect.redirect_type,
+      targetPostId: updatedRedirect.target_post_id,
+      targetUrl: updatedRedirect.target_url,
+      httpStatusCode: updatedRedirect.http_status_code,
+      createdBy: updatedRedirect.created_by,
+      createdAt: updatedRedirect.created_at,
+      updatedAt: updatedRedirect.updated_at,
+      notes: updatedRedirect.notes
+    }
+
     return successResponse({
-      redirect: updatedRedirect,
+      redirect: mappedRedirect,
       warnings: validationResult.warnings
     })
   } catch (error) {

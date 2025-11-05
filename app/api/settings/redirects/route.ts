@@ -65,8 +65,18 @@ export async function GET(request: NextRequest) {
     }
     
     const enrichedRedirects = redirectsData.map(redirect => ({
-      ...redirect,
-      source_post: sourcePostsMap[redirect.source_post_id] || null
+      id: redirect.id,
+      sourcePostId: redirect.source_post_id,
+      redirectType: redirect.redirect_type,
+      targetPostId: redirect.target_post_id,
+      targetUrl: redirect.target_url,
+      httpStatusCode: redirect.http_status_code,
+      createdBy: redirect.created_by,
+      createdAt: redirect.created_at,
+      updatedAt: redirect.updated_at,
+      notes: redirect.notes,
+      source_post: sourcePostsMap[redirect.source_post_id] || null,
+      target_post: redirect.target_post
     }))
 
     return successResponse({
@@ -150,8 +160,21 @@ export async function POST(request: NextRequest) {
 
     await invalidateRedirectCache(sourcePostId)
 
+    const mappedRedirect = {
+      id: newRedirect.id,
+      sourcePostId: newRedirect.source_post_id,
+      redirectType: newRedirect.redirect_type,
+      targetPostId: newRedirect.target_post_id,
+      targetUrl: newRedirect.target_url,
+      httpStatusCode: newRedirect.http_status_code,
+      createdBy: newRedirect.created_by,
+      createdAt: newRedirect.created_at,
+      updatedAt: newRedirect.updated_at,
+      notes: newRedirect.notes
+    }
+
     return successResponse({
-      redirect: newRedirect,
+      redirect: mappedRedirect,
       warnings: validationResult.warnings
     }, false, 201)
   } catch (error) {
