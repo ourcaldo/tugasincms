@@ -8,7 +8,7 @@ import { invalidateRedirectCache } from '@/lib/cache'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUserId = await getUserIdFromClerk()
@@ -16,7 +16,7 @@ export async function PUT(
       return unauthorizedResponse('You must be logged in')
     }
 
-    const redirectId = params.id
+    const { id: redirectId } = await params
     const body = await request.json()
 
     const validation = updateRedirectSchema.safeParse(body)
@@ -105,7 +105,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUserId = await getUserIdFromClerk()
@@ -113,7 +113,7 @@ export async function DELETE(
       return unauthorizedResponse('You must be logged in')
     }
 
-    const redirectId = params.id
+    const { id: redirectId } = await params
 
     const { data: existingRedirect, error: fetchError } = await supabase
       .from('post_redirects')

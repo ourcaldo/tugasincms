@@ -243,3 +243,36 @@ npm run start
 - **Advanced Features**: ❌ 0% Complete (SEO, scheduled posts, etc.)
 
 **Overall Progress**: ~70% Complete
+
+---
+
+## 📅 **Recent Changes**
+
+### November 5, 2025: Build Fix - Next.js 15 Async Params Migration
+- **FIXED**: TypeScript build error in redirect route handlers preventing production build
+- **ERROR**: `Type "{ params: { id: string; }; }" is not a valid type for the function's second argument`
+- **ROOT CAUSE**: Next.js 15 changed route params API - params are now async and must be awaited
+- **FILES FIXED**: `app/api/settings/redirects/[id]/route.ts` (PUT and DELETE handlers)
+- **CHANGES**:
+  - Changed signature from `{ params: { id: string } }` to `{ params: Promise<{ id: string }> }`
+  - Updated param access from `params.id` to `const { id: redirectId } = await params`
+- **RESULT**: ✅ Production build now succeeds - all 40 routes compile successfully
+- **BUILD OUTPUT**: 40 routes generated, middleware compiled successfully
+- **VERIFIED**: Other dynamic route files already using correct async pattern
+- **ARCHITECT REVIEWED**: Confirmed implementation follows Next.js 15 best practices
+
+### November 5, 2025: Critical UX Fixes - Redirect Form Scrolling and Status Code Display
+- **FIXED**: Post list scrolling issue in redirect creation/edit dialogs - users couldn't scroll through long lists of posts
+- **ROOT CAUSE (Scrolling)**: CommandList component didn't have max-height set, preventing scroll when many posts exist
+- **SOLUTION (Scrolling)**: Added `className="max-h-[300px] overflow-y-auto"` to all three CommandList components
+- **FILES CHANGED**: `components/settings/redirects-list.tsx` (lines 259, 322, 577)
+- **FIXED**: HTTP Status Code field showing "-" (empty) instead of actual status code value (301, 302, etc.)
+- **ROOT CAUSE (Status Code)**: API returned snake_case database field names (`http_status_code`) but frontend TypeScript expected camelCase (`httpStatusCode`)
+- **SOLUTION (Status Code)**: Added explicit field mapping in all redirect API endpoints to convert snake_case to camelCase
+- **FILES CHANGED**: 
+  - `app/api/settings/redirects/route.ts` (GET and POST endpoints)
+  - `app/api/settings/redirects/[id]/route.ts` (PUT endpoint)
+- **IMPACT**: Redirect creation and editing now works smoothly with proper scrolling for 1000+ posts
+- Users can now see the actual HTTP status codes (301, 302, 307, 308) instead of empty values
+- Field mapping ensures consistency between database schema (snake_case) and TypeScript interfaces (camelCase)
+- **ARCHITECT REVIEWED**: Confirmed fixes are complete, consistent, and align with `types/index.ts::PostRedirect` interface
