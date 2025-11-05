@@ -207,6 +207,14 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Critical Bug Fix - Missing redirect Field in API Responses
+  - **FIXED**: `redirect` field not appearing in post API responses at all
+  - **ROOT CAUSE**: In `lib/post-mapper.ts` line 69, using `redirect || undefined` converted `null` values to `undefined`
+  - **IMPACT**: When a property is `undefined` in JavaScript, it gets excluded from JSON serialization completely
+  - **SOLUTION**: Changed `redirect: redirect || undefined` to `redirect: redirect` to preserve `null` values
+  - **RESULT**: All post responses now include `"redirect": null` when no redirect is configured (as per REDIRECTION_FEATURE_PLAN.md)
+  - Complies with plan requirement: "Every post API response includes redirect field (null when not configured)"
+
 - November 5, 2025: Critical Bug Fix - Missing await in Post Mapper Functions
   - **FIXED**: All API endpoints returning `"posts": {}` (empty object) instead of posts array
   - **ROOT CAUSE**: `mapPostsFromDB()` and `mapPostFromDB()` are async functions but were called without `await` in 10 different files

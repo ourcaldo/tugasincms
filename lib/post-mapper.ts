@@ -66,7 +66,7 @@ export async function mapPostFromDB(post: PostFromDB, includeRedirect: boolean =
     },
     categories: (post.categories || []).map((pc: any) => pc.category).filter(Boolean),
     tags: (post.tags || []).map((pt: any) => pt.tag).filter(Boolean),
-    redirect: redirect || undefined
+    redirect: redirect
   }
 }
 
