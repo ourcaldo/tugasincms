@@ -118,3 +118,20 @@ export function closeCacheConnection(): void {
     redisClient = null
   }
 }
+
+export async function invalidateRedirectCache(postId: string): Promise<boolean> {
+  const client = getRedisClient()
+  if (!client) return false
+
+  try {
+    const redirectKey = `redirect:${postId}`
+    await client.del(redirectKey)
+    
+    await deleteCachedData(`api:v1:posts:${postId}*`)
+    await deleteCachedData(`api:public:posts:${postId}*`)
+    
+    return true
+  } catch (error) {
+    return false
+  }
+}

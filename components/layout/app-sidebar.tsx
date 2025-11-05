@@ -51,6 +51,7 @@ const menuItems = [
     items: [
       { title: 'Profile', href: '/settings/profile', tooltip: 'Update your profile information' },
       { title: 'API Tokens', href: '/settings/tokens', tooltip: 'Manage API access tokens' },
+      { title: 'Redirects', href: '/settings/redirects', tooltip: 'Manage post redirects for content consolidation and URL changes' },
     ],
   },
 ];

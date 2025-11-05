@@ -694,6 +694,134 @@ const pagination = data.pagination;
 
 ---
 
+## Post Redirects
+
+### Overview
+
+The redirect feature enables content consolidation and URL management through two redirect types:
+- **Post-to-Post**: Redirect one post to another (content cannibalization)
+- **Post-to-URL**: Redirect to external URLs (content migration)
+
+All post responses include a `redirect` field (null when no redirect is configured).
+
+### Redirect Response Format
+
+When fetching a post with a redirect configured, the response includes:
+
+**Post with Post-to-Post Redirect:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "title": "Old Post",
+    "content": "...",
+    "redirect": {
+      "type": "post",
+      "httpStatus": 301,
+      "target": {
+        "postId": "target-uuid",
+        "slug": "new-post-slug",
+        "title": "New Post"
+      },
+      "notes": "Content consolidated"
+    }
+  }
+}
+```
+
+**Post with Post-to-URL Redirect:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "title": "Moved Post",
+    "redirect": {
+      "type": "url",
+      "httpStatus": 301,
+      "target": {
+        "url": "https://newsite.com/article"
+      },
+      "notes": "Moved to external platform"
+    }
+  }
+}
+```
+
+**Post without Redirect:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "title": "Normal Post",
+    "content": "...",
+    "redirect": null
+  }
+}
+```
+
+### Tombstone Pattern
+
+Redirects persist even after the source post is deleted, enabling seamless URL transitions:
+
+```json
+{
+  "success": false,
+  "error": "Post not found",
+  "redirect": {
+    "type": "post",
+    "httpStatus": 301,
+    "target": {
+      "postId": "target-uuid",
+      "slug": "replacement-post",
+      "title": "Replacement Post"
+    }
+  }
+}
+```
+
+### HTTP Status Codes
+
+- **301**: Permanent redirect (recommended for content consolidation)
+- **302**: Temporary redirect
+- **307**: Temporary redirect (method preserved)
+- **308**: Permanent redirect (method preserved)
+- **410**: Gone (returned when target post is deleted)
+
+### Frontend Implementation
+
+The frontend should check the `redirect` field in post responses:
+
+```javascript
+const response = await fetch(`/api/v1/posts/${postId}`, {
+  headers: { 'Authorization': 'Bearer token' }
+});
+
+const { success, data, redirect } = await response.json();
+
+if (data?.redirect) {
+  // Handle redirect based on type
+  if (data.redirect.type === 'post') {
+    // Redirect to target post
+    window.location.href = `/blog/${data.redirect.target.slug}`;
+  } else if (data.redirect.type === 'url') {
+    // Redirect to external URL
+    window.location.href = data.redirect.target.url;
+  }
+} else if (!success && redirect) {
+  // Tombstone redirect (post deleted but redirect active)
+  if (redirect.type === 'post') {
+    window.location.href = `/blog/${redirect.target.slug}`;
+  } else {
+    window.location.href = redirect.target.url;
+  }
+}
+```
+
+---
+
 ## Support
 
 For API support or questions:

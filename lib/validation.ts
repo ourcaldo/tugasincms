@@ -66,3 +66,37 @@ export const publicPostSchema = z.object({
   categories: z.string().optional(),
   tags: z.string().optional(),
 })
+
+export const redirectSchema = z.object({
+  sourcePostId: z.string().uuid('Invalid source post ID'),
+  redirectType: z.enum(['post', 'url']),
+  targetPostId: z.string().uuid('Invalid target post ID').optional(),
+  targetUrl: z.string().url('Invalid target URL').optional(),
+  httpStatusCode: z.number().int().refine((val) => [301, 302, 307, 308].includes(val), {
+    message: 'HTTP status code must be 301, 302, 307, or 308'
+  }).default(301),
+  notes: z.string().max(1000, 'Notes are too long').optional(),
+}).refine(
+  (data) => {
+    if (data.redirectType === 'post') {
+      return !!data.targetPostId && !data.targetUrl;
+    }
+    if (data.redirectType === 'url') {
+      return !!data.targetUrl && !data.targetPostId;
+    }
+    return false;
+  },
+  {
+    message: 'For post redirects, provide targetPostId only. For URL redirects, provide targetUrl only.',
+  }
+)
+
+export const updateRedirectSchema = z.object({
+  redirectType: z.enum(['post', 'url']).optional(),
+  targetPostId: z.string().uuid('Invalid target post ID').optional(),
+  targetUrl: z.string().url('Invalid target URL').optional(),
+  httpStatusCode: z.number().int().refine((val) => [301, 302, 307, 308].includes(val), {
+    message: 'HTTP status code must be 301, 302, 307, or 308'
+  }).optional(),
+  notes: z.string().max(1000, 'Notes are too long').optional(),
+})

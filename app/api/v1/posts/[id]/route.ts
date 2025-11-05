@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getCachedData, setCachedData } from '@/lib/cache'
 import { verifyApiToken, extractBearerToken } from '@/lib/auth'
@@ -62,18 +62,29 @@ export async function GET(
     
     const { data: post, error } = await query.single()
     
-    if (error) {
-      if (error.code === 'PGRST116') {
+    if (error || !post) {
+      if (error?.code === 'PGRST116' || !post) {
+        const { resolveRedirect } = await import('@/lib/redirect-resolver')
+        const redirect = await resolveRedirect(id)
+        
+        if (redirect) {
+          const tombstoneResponse = NextResponse.json(
+            {
+              success: false,
+              error: 'Post not found',
+              redirect: redirect
+            },
+            { status: 404 }
+          )
+          return setCorsHeaders(tombstoneResponse, origin)
+        }
+        
         return setCorsHeaders(notFoundResponse('Post not found'), origin)
       }
       throw error
     }
     
-    if (!post) {
-      return setCorsHeaders(notFoundResponse('Post not found'), origin)
-    }
-    
-    const postWithRelations = mapPostFromDB(post)
+    const postWithRelations = await mapPostFromDB(post, true)
     
     await setCachedData(cacheKey, postWithRelations, 3600)
     

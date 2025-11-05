@@ -207,6 +207,24 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Post Redirection Feature - Implementation Complete
+  - **IMPLEMENTED**: Production-ready post redirection system for content consolidation and URL management
+  - **DATABASE**: Created `post_redirects` table with tombstone pattern support (migration SQL ready in `migrations/`)
+  - **BACKEND**: Implemented redirect types: post-to-post and post-to-URL with HTTP status codes (301, 302, 307, 308)
+  - **BACKEND**: Created redirect resolver (`lib/redirect-resolver.ts`) and validator (`lib/redirect-validator.ts`)
+  - **BACKEND**: Added redirect validation with circular detection and broken redirect handling
+  - **API**: New `/api/settings/redirects` endpoints (GET, POST, PUT, DELETE) with Clerk authentication
+  - **API**: Updated `/api/v1/posts/[id]` to include redirect metadata in all responses
+  - **FRONTEND**: Created redirect management UI at `/settings/redirects` with full CRUD operations
+  - **FRONTEND**: Redirect list component with filters, search, and type-based filtering (post/URL)
+  - **FRONTEND**: Form dialog with validation, post selection, and circular redirect warnings
+  - **CACHING**: Added redirect caching with automatic invalidation on updates
+  - **DOCS**: Updated `API_DOCUMENTATION.md` with redirect response formats and implementation examples
+  - **NAVIGATION**: Added "Redirects" menu item to Settings section in sidebar
+  - **MIGRATION REQUIRED**: User must run SQL migration in Supabase (see `migrations/001_post_redirects.sql`)
+  - Feature enables content cannibalization workflows and maintains SEO through proper redirect handling
+  - Supports tombstone redirects (persist after source post deletion) for seamless URL transitions
+
 - November 5, 2025: Post Redirection Feature - Planning & Documentation
   - **PLANNED**: Comprehensive post redirection system for managing content consolidation and URL changes
   - **DOCUMENTED**: Complete feature specification in `REDIRECTION_FEATURE_PLAN.md`

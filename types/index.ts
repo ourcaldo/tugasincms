@@ -74,3 +74,33 @@ export interface PostFilters {
   page?: number;
   limit?: number;
 }
+
+export interface PostRedirect {
+  id: string;
+  sourcePostId: string;
+  redirectType: 'post' | 'url';
+  targetPostId?: string;
+  targetUrl?: string;
+  httpStatusCode: 301 | 302 | 307 | 308;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  notes?: string;
+}
+
+export interface RedirectMetadata {
+  type: 'post' | 'url';
+  httpStatus: number;
+  target: {
+    postId?: string;
+    slug?: string;
+    title?: string;
+    url?: string;
+    error?: string;
+  };
+  notes?: string;
+}
+
+export interface PostWithRedirect extends Post {
+  redirect?: RedirectMetadata | null;
+}

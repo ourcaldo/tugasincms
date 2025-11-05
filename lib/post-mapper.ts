@@ -1,3 +1,6 @@
+import { resolveRedirect } from './redirect-resolver'
+import type { RedirectMetadata } from '../types'
+
 export interface PostFromDB {
   id: string
   title: string
@@ -37,9 +40,12 @@ export interface MappedPost {
   }
   categories: any[]
   tags: any[]
+  redirect?: RedirectMetadata | null
 }
 
-export function mapPostFromDB(post: PostFromDB): MappedPost {
+export async function mapPostFromDB(post: PostFromDB, includeRedirect: boolean = true): Promise<MappedPost> {
+  const redirect = includeRedirect ? await resolveRedirect(post.id) : null
+  
   return {
     id: post.id,
     title: post.title,
@@ -60,9 +66,10 @@ export function mapPostFromDB(post: PostFromDB): MappedPost {
     },
     categories: (post.categories || []).map((pc: any) => pc.category).filter(Boolean),
     tags: (post.tags || []).map((pt: any) => pt.tag).filter(Boolean),
+    redirect: redirect || undefined
   }
 }
 
-export function mapPostsFromDB(posts: PostFromDB[]): MappedPost[] {
-  return posts.map(mapPostFromDB)
+export async function mapPostsFromDB(posts: PostFromDB[], includeRedirect: boolean = false): Promise<MappedPost[]> {
+  return Promise.all(posts.map(post => mapPostFromDB(post, includeRedirect)))
 }
