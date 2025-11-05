@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS post_redirects (
   http_status_code INTEGER DEFAULT 301 CHECK (http_status_code IN (301, 302, 307, 308)),
   
   -- Metadata
-  created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_by VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   notes TEXT,

@@ -207,6 +207,13 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Database Migration Fix - Post Redirects created_by Column Type
+  - **FIXED**: Database migration error - Changed `created_by` column type from UUID to VARCHAR(255)
+  - **REASON**: CMS uses Clerk authentication with string-based user IDs (e.g., 'user_33QTHobngBl4hGcnuEjuKnOhlqr'), not UUIDs
+  - **UPDATED**: Both `migrations/001_post_redirects.sql` and `REDIRECTION_FEATURE_PLAN.md` to reflect correct data type
+  - **RESOLVED**: Foreign key constraint error: "Key columns 'created_by' and 'id' are of incompatible types"
+  - Migration SQL now ready for execution in Supabase
+
 - November 5, 2025: Post Redirection Feature - Critical Bug Fixes (Architect-Verified)
   - **FIXED**: Tombstone support in public API - `/api/v1/posts/[id]` now returns 404 with redirect metadata for deleted posts
   - **FIXED**: Circular redirect detection - Implemented iterative chain traversal (depth limit: 10) to detect loops of any length
