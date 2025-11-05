@@ -223,7 +223,8 @@ curl -X GET "https://your-domain.com/api/v1/posts?page=1&limit=10&category=techn
             "name": "JavaScript",
             "slug": "javascript"
           }
-        ]
+        ],
+        "redirect": null
       }
     ],
     "pagination": {
@@ -285,7 +286,8 @@ curl -X GET "https://your-domain.com/api/v1/posts/my-post-slug" \
       "slug": "post-slug"
     },
     "categories": [...],
-    "tags": [...]
+    "tags": [...],
+    "redirect": null
   },
   "cached": false
 }

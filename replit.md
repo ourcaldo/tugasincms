@@ -207,6 +207,14 @@ Standardized response structure across all endpoints:
 - `cache.ts` - Redis caching utilities
 
 ## Recent Changes
+- November 5, 2025: Documentation Update - API_DOCUMENTATION.md Updated for Redirect Feature
+  - **UPDATED**: Added `redirect` field to all post object examples in API_DOCUMENTATION.md
+  - **SECTIONS UPDATED**:
+    - "Get All Posts" example response now shows `"redirect": null`
+    - "Get Single Post" example response now shows `"redirect": null`
+  - **NOTE**: Post Redirects section (comprehensive documentation of redirect feature) was already present in the file
+  - Documentation now accurately reflects that every post response includes the `redirect` field (null when not configured)
+
 - November 5, 2025: Critical Bug Fix - Missing redirect Field in API Responses
   - **FIXED**: `redirect` field not appearing in post API responses at all
   - **ROOT CAUSE**: In `lib/post-mapper.ts` line 69, using `redirect || undefined` converted `null` values to `undefined`
