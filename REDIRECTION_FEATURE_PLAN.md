@@ -130,11 +130,19 @@ CREATE INDEX idx_redirects_type ON post_redirects(redirect_type);
 ### Schema Rationale
 
 1. **`source_post_id` is NOT NULL with UNIQUE constraint**: One redirect per post, directly tied to post ID
-2. **`source_post_id` uses ON DELETE CASCADE**: When source post is deleted, redirect is automatically removed
+2. **`source_post_id` NO FOREIGN KEY CONSTRAINT**: Redirects persist even after source post is deleted (tombstone pattern)
 3. **`target_post_id` uses ON DELETE NO ACTION**: Prevents accidental deletion of target posts with active redirects pointing to them
 4. **No `source_slug` field needed**: Frontend uses UUID for lookups, not slugs
 5. **Check constraints**: Ensures data integrity (valid redirect types, no self-redirects)
 6. **HTTP status codes**: Supports different redirect semantics (301 permanent, 302 temporary, etc.)
+
+### Tombstone Pattern
+
+**Critical Design Decision**: Redirects survive source post deletion
+- When you delete a post, its redirect configuration **remains active**
+- Future requests to deleted post UUID still return redirect metadata
+- This allows content consolidation without losing redirect history
+- Redirect record acts as a "tombstone" marking where content was moved
 
 ### Redirect Configuration Flexibility
 
